@@ -625,8 +625,6 @@ class Conform(gl.Contract):
         agent.owner = gl.message.sender_address
         agent.name = name
         agent.endpoint = endpoint
-        if specification == str(agent.specification):
-            return
         agent.specification = specification
         agent.spec_version = u32(1)
         agent.status = u8(AGENT_ACTIVE)
@@ -650,6 +648,8 @@ class Conform(gl.Contract):
         specification = str(specification).strip()
         if len(specification) == 0 or len(specification) > MAX_SPEC_LEN:
             raise gl.vm.UserError(f"{ERR_EXPECTED}: invalid specification")
+        if specification == str(agent.specification):
+            return
         agent.specification = specification
         agent.spec_version = u32(int(agent.spec_version) + 1)
         self._refresh_definition_hash(agent)
