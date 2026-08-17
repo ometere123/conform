@@ -44,6 +44,14 @@ def test_rejects_private_endpoint(direct_vm, direct_deploy):
         contract.register_agent("bad", "http://127.0.0.1:8080", SPEC)
 
 
+
+
+def test_rejects_ipv6_loopback_endpoint(direct_vm, direct_deploy):
+    contract = direct_deploy("contracts/conform.py")
+    with direct_vm.expect_revert("endpoint must be a public http(s) URL"):
+        contract.register_agent("bad", "http://[::1]", SPEC)
+
+
 def test_rejects_absolute_probe_url(direct_vm, direct_deploy):
     contract, agent_id = register(direct_deploy)
     with direct_vm.expect_revert("path must be relative"):
