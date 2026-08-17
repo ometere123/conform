@@ -9,7 +9,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      GENVM_VERSION: v0.2.16
+      GENVM_VERSION: v0.3.0-rc7
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
