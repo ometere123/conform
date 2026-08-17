@@ -1,4 +1,5 @@
 import inspect
+import time
 from pathlib import Path
 
 from gltest import get_default_account
@@ -13,17 +14,23 @@ def accepted_kwargs(call, values):
 
 
 def wait_for_acceptance(client, tx_hash):
-    return client.wait_for_transaction_receipt(
-        **accepted_kwargs(
-            client.wait_for_transaction_receipt,
-            {
-                "transaction_hash": tx_hash,
-                "interval": 2000,
-                "retries": 90,
-                "full_transaction": True,
-            },
-        )
-    )
+    values = {
+        "transaction_hash": tx_hash,
+        "interval": 6000,
+        "retries": 60,
+        "full_transaction": True,
+    }
+
+    for attempt in range(4):
+        try:
+            return client.wait_for_transaction_receipt(
+                **accepted_kwargs(client.wait_for_transaction_receipt, values)
+            )
+        except Exception as exc:
+            if "Rate limit exceeded" not in str(exc) or attempt == 3:
+                raise
+            print(f"STUDIONET_RATE_LIMIT_BACKOFF attempt={attempt + 1}: {exc}")
+            time.sleep(30)
 
 
 def write(client, account, address, function_name, args):
