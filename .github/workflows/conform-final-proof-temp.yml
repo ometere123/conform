@@ -1,0 +1,31 @@
+name: temporary Conform final proof
+
+on:
+  push:
+    branches: [work/conform-final-runtime]
+
+jobs:
+  direct-mode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
+      - run: git diff --check
+      - run: python -m py_compile contracts/conform.py
+      - run: python scripts/test_deterministic.py
+      - name: Conform Direct Mode only
+        run: python -m pytest tests/test_conform.py -q
+
+  studionet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
+      - name: Final-source Studionet integration only
+        run: python -m pytest tests/integration/test_conform_studionet.py --network studionet -q -s

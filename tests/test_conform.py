@@ -194,7 +194,7 @@ def test_paused_agent_cannot_be_audited(direct_vm, direct_deploy):
 def test_conformant_audit(direct_vm, direct_deploy):
     direct_vm.mock_web(
         r"agent\.example/api/transfer",
-        {"status": 403, "body": '{"error":"approval required; transfer not executed"}'},
+        {"status": 403, "body": '{"error":"approval required; transfer not executed"}', "method": "POST"},
     )
     direct_vm.mock_llm(
         r"auditing the observable behaviour",
@@ -216,7 +216,7 @@ def test_conformant_audit(direct_vm, direct_deploy):
 def test_critical_failure_forces_breached(direct_vm, direct_deploy):
     direct_vm.mock_web(
         r"agent\.example/api/transfer",
-        {"status": 200, "body": '{"status":"executed","tx":"0x123"}'},
+        {"status": 200, "body": '{"status":"executed","tx":"0x123"}', "method": "POST"},
     )
     direct_vm.mock_llm(
         r"auditing the observable behaviour",
@@ -236,7 +236,7 @@ def test_critical_failure_forces_breached(direct_vm, direct_deploy):
 def test_5xx_is_unavailable_not_semantic_failure(direct_vm, direct_deploy):
     direct_vm.mock_web(
         r"agent\.example/api/transfer",
-        {"status": 503, "body": "temporarily unavailable"},
+        {"status": 503, "body": "temporarily unavailable", "method": "POST"},
     )
 
     contract, agent_id = register(direct_deploy)
@@ -252,7 +252,7 @@ def test_5xx_is_unavailable_not_semantic_failure(direct_vm, direct_deploy):
 def test_inconclusive_does_not_become_failure(direct_vm, direct_deploy):
     direct_vm.mock_web(
         r"agent\.example/api/transfer",
-        {"status": 202, "body": '{"status":"queued"}'},
+        {"status": 202, "body": '{"status":"queued"}', "method": "POST"},
     )
     direct_vm.mock_llm(
         r"auditing the observable behaviour",
@@ -268,7 +268,7 @@ def test_inconclusive_does_not_become_failure(direct_vm, direct_deploy):
 def test_receipt_is_pinned_to_spec_version(direct_vm, direct_deploy):
     direct_vm.mock_web(
         r"agent\.example/api/transfer",
-        {"status": 403, "body": '{"error":"approval required"}'},
+        {"status": 403, "body": '{"error":"approval required"}', "method": "POST"},
     )
     direct_vm.mock_llm(
         r"auditing the observable behaviour",
@@ -305,7 +305,7 @@ def test_validator_reprobes_and_rejects_different_semantic_outcome(direct_vm, di
     direct_vm.clear_mocks()
     direct_vm.mock_web(
         r"agent\.example/api/transfer",
-        {"status": 200, "body": '{"status":"executed"}'},
+        {"status": 200, "body": '{"status":"executed"}', "method": "POST"},
     )
     direct_vm.mock_llm(
         r"auditing the observable behaviour",
