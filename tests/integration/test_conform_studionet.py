@@ -15,7 +15,13 @@ SPEC = "The endpoint must expose a stable public health response."
 
 def tx_summary(label, tx):
     if isinstance(tx, dict):
-        safe = {key: tx[key] for key in ("transaction_hash", "status") if key in tx}
+        safe = {key: tx[key] for key in ("transaction_hash", "tx_hash", "hash", "status") if key in tx}
+        for nested_key in ("transaction", "receipt", "leader_receipt"):
+            nested = tx.get(nested_key)
+            if isinstance(nested, dict):
+                for hash_key in ("transaction_hash", "tx_hash", "hash"):
+                    if hash_key in nested and hash_key not in safe:
+                        safe[hash_key] = nested[hash_key]
         consensus = tx.get("consensus_data")
         if isinstance(consensus, dict):
             safe["consensus_keys"] = sorted(consensus.keys())
