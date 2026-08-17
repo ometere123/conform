@@ -1,0 +1,25 @@
+name: temporary-studionet-deploy
+
+on:
+  push:
+    branches:
+      - work/studionet-deploy-2026-08-17
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install current official GenLayer test tooling
+        run: |
+          python -m pip install --upgrade pip pytest
+          python -m pip install --upgrade 'git+https://github.com/genlayerlabs/genlayer-testing-suite.git@main'
+      - name: Show network configuration
+        run: |
+          cat gltest.config.yaml
+          python -m pip show genlayer-test | grep -E '^(Name|Version):'
+      - name: Deploy Conform to Studionet without genvm-lint
+        run: gltest --network studionet --default-wait-retries 60 --default-wait-interval 2000 validation/test_studionet_deploy.py -v -s
