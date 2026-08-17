@@ -8,13 +8,21 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      GENVM_VERSION: v0.2.16
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install test tooling
-        run: python -m pip install --upgrade pip genlayer-test pytest
+      - name: Install current official test tooling
+        run: |
+          python -m pip install --upgrade pip pytest
+          python -m pip install --upgrade 'git+https://github.com/genlayerlabs/genlayer-testing-suite.git@main'
+      - name: Show installed versions
+        run: |
+          python -m pip show genlayer-test | grep -E '^(Name|Version):'
+          python -c "from gltest.direct import sdk_loader; print('GENVM_VERSION=', sdk_loader.resolve_version()); print('assets=', sdk_loader.RUNNER_BUNDLE_ASSETS)"
       - name: Run SDK-free deterministic checks
         continue-on-error: true
         run: python scripts/test_deterministic.py
