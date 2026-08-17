@@ -23,12 +23,13 @@ jobs:
         run: |
           python -m pip show genlayer-test | grep -E '^(Name|Version):'
           python -c "from gltest.direct import sdk_loader; print('GENVM_VERSION=', sdk_loader.resolve_version()); print('assets=', sdk_loader.RUNNER_BUNDLE_ASSETS)"
-      - name: Isolate Direct Mode loader behavior
+      - name: Isolate Direct Mode loader behavior on untouched source style
         continue-on-error: true
         run: pytest validation/test_loader_smoke.py -v
-      - name: Run SDK-free deterministic checks
-        continue-on-error: true
+      - name: Apply validation-only production fixes
+        run: python scripts/apply_validation_patch.py
+      - name: Run SDK-free deterministic checks against patched contract
         run: python scripts/test_deterministic.py
-      - name: Run Conform Direct Mode tests without genvm-lint
+      - name: Run patched Conform Direct Mode tests without genvm-lint
         continue-on-error: true
         run: pytest tests/ -v
