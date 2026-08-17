@@ -22,7 +22,7 @@ Consumers can call `latest_verdict(agent_id)` and require `has_audit`, `is_curre
 
 ## Evidence
 
-The fast checks are intentionally independent of external GenVM assets: `python scripts/test_deterministic.py` exercises the actual pure helpers extracted from the production contract, including endpoint safety, credential rejection, parsing, canonicalisation, aggregation, and exhaustive two-probe combinations. The current result is 144 exhaustive two-probe combinations plus edge cases; compilation also passes. Direct Mode tests are provided in `tests/test_conform.py`. In the Windows environment used for this checkout, the installed runner currently fails before contract execution while unlinking its stdin temporary file (`PermissionError [WinError 32]`), so that result is classified as an upstream/platform runner defect rather than Conform execution. No final-source Studionet deployment or audit receipt is claimed without verifiable network evidence.
+The fast checks are intentionally independent of external GenVM assets: `python scripts/test_deterministic.py` exercises the actual pure helpers extracted from the production contract, including endpoint safety, credential rejection, parsing, canonicalisation, aggregation, and exhaustive two-probe combinations. The result is 144 exhaustive two-probe combinations plus edge cases; compilation also passes. Ubuntu Direct Mode executed `tests/test_conform.py` with 20 passed tests. Native Windows has an upstream tempfile-cleanup defect (`PermissionError [WinError 32]`), classified separately from contract execution. Final Studionet deployment and lifecycle evidence is recorded in [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Security boundary
 

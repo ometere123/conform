@@ -1,5 +1,18 @@
 # Conform
 
+## Final Studionet demonstration
+
+| Field | Result |
+|---|---|
+| Network | Studionet (`https://studio.genlayer.com/api`) |
+| Contract | `0xd56726Db2eb3E707Dfd9A27A1F1b5D90301DC658` |
+| Deployment transaction | `0xaddbef505c1419f9de03e940d0983bdac60bfd8198f4b83c546a995dddfdc466` |
+| Deployment state | status `5`, leader execution `SUCCESS` |
+| Consensus | validators/votes present; non-leader-only run |
+| Live result | `CONFORMANT`; current and audited definition matched |
+
+The final Studionet run also demonstrated specification-change invalidation and a harmless owner-authorized POST audit. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the complete transaction table.
+
 **Consensus-backed behavioural conformance audits for autonomous agents.**
 
 Conform is a standalone GenLayer Intelligent Contract primitive. It lets an agent owner publish a versioned behavioural specification plus executable probes, then lets anyone ask GenLayer validators to independently test the live agent and produce a reusable on-chain audit receipt.
@@ -287,7 +300,7 @@ python scripts/test_deterministic.py
 python -m pytest -q
 ```
 
-The deterministic suite executes the actual pure helpers from `contracts/conform.py` and currently reports 144 exhaustive two-probe combinations plus edge cases. Direct Mode tests are meaningful runtime tests, but their result depends on the installed official `genlayer-test` and platform. In the Windows environment used for this checkout, the installed runner currently fails before contract execution while unlinking its stdin temporary file (`PermissionError [WinError 32]`). This is not reported as a Conform test failure. Studionet deployment and lifecycle receipts must be recorded against the final source commit; no deployment address or transaction is claimed here without a verifiable final-source receipt.
+The deterministic suite executes the actual pure helpers from `contracts/conform.py` and reports 144 exhaustive two-probe combinations plus edge cases. Ubuntu Direct Mode executed the contract with 20 passed tests; the native Windows runner has a separate upstream tempfile-cleanup defect (`PermissionError [WinError 32]`). The final Studionet deployment and lifecycle evidence is recorded in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Deployment and reuse
 

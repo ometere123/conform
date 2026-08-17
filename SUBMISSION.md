@@ -76,9 +76,11 @@ The Direct Mode suite covers registration, owner-only mutation, endpoint/probe r
 
 The validator-disagreement test is the key consensus test: the leader sees a compliant refusal, the validator independently sees an unauthorised execution, and validation returns false.
 
-The permanent deterministic check extracts and executes the actual pure helpers from `contracts/conform.py`; it currently passes 144 exhaustive two-probe combinations plus edge cases, including private/IPv6 and credential-bearing endpoint rejection. Contract compilation passes. The bundled Windows environment has `genlayer-test 0.29.2` and `genlayer-py 0.16.3`, but Direct Mode currently fails before contract import because the runner attempts to unlink its redirected stdin file immediately after `dup2`, producing `PermissionError [WinError 32]`. This is documented as an upstream/platform runner issue, not counted as Conform execution.
+The permanent deterministic check extracts and executes the actual pure helpers from `contracts/conform.py`; it passes 144 exhaustive two-probe combinations plus edge cases, including private/IPv6 and credential-bearing endpoint rejection. Contract compilation passes. Ubuntu Direct Mode executed the contract with 20 passed tests. Native Windows has an upstream tempfile-cleanup defect (`PermissionError [WinError 32]`), which is not counted as a Conform execution failure.
 
-No final-source Studionet address, transaction hash, or accepted live `audit()` receipt is claimed in this checkout. Historical network evidence is deliberately not presented as proof for a different source commit.
+## Studionet evidence
+
+The final live run deployed at `0xd56726Db2eb3E707Dfd9A27A1F1b5D90301DC658` on Studionet. Deployment transaction was `0xaddbef505c1419f9de03e940d0983bdac60bfd8198f4b83c546a995dddfdc466`; registration, probe creation, audit, specification mutation, and harmless owner POST audit all reached status `5` with leader execution `SUCCESS` and validator/vote data exposed. The GET audit stored a `CONFORMANT` receipt, and changing the specification made the old receipt unreliable and failed the exact-definition gate. Full transaction evidence is in `docs/DEPLOYMENT.md`.
 
 ## Repository entry points
 
