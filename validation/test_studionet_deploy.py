@@ -7,7 +7,7 @@ def test_deploy_conform_to_studionet():
     account = get_default_account()
     print(f"STUDIONET_DEPLOYER={account.address}")
 
-    factory = get_contract_factory(contract_file_path="contracts/conform.py")
+    factory = get_contract_factory(contract_file_path="conform.py")
     receipt = factory.deploy_contract_tx(
         account=account,
         consensus_max_rotations=3,
