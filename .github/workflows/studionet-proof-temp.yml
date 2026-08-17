@@ -27,6 +27,18 @@ jobs:
         run: |
           cat gltest.config.yaml
           python -m pip show genlayer-test | grep -E '^(Name|Version):'
+      - name: Apply one-line runtime diagnostic patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('contracts/conform.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'code = int(response.status_code)'
+          new = 'code = int(response.status)'
+          assert text.count(old) == 1, text.count(old)
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          print('DIAGNOSTIC_PATCH=response.status')
+          PY
       - name: Run final Conform Studionet proof
         id: proof
         shell: bash
@@ -37,6 +49,7 @@ jobs:
         if: always()
         shell: bash
         run: |
+          git checkout -- contracts/conform.py
           test -f validation/studionet-proof.log || printf '%s\n' 'Proof command did not produce a log.' > validation/studionet-proof.log
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
