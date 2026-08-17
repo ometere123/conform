@@ -7,11 +7,42 @@
 | Network | Studionet (`https://studio.genlayer.com/api`) |
 | Contract | `0xd56726Db2eb3E707Dfd9A27A1F1b5D90301DC658` |
 | Deployment transaction | `0xaddbef505c1419f9de03e940d0983bdac60bfd8198f4b83c546a995dddfdc466` |
+| Deployed source | `d07a95c2314a8aa701b70bb7b71981efea00a129` |
 | Deployment state | status `5`, leader execution `SUCCESS` |
 | Consensus | validators/votes present; non-leader-only run |
 | Live result | `CONFORMANT`; current and audited definition matched |
 
 The final Studionet run also demonstrated specification-change invalidation and a harmless owner-authorized POST audit. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the complete transaction table.
+
+Live lifecycle highlights:
+
+| Operation | Transaction | Result |
+|---|---|---|
+| Register GET profile | `0x3cf5f3baf71e79352026e8febab56917aaf1f3e1392442cfc8a717fdc06538a8` | accepted |
+| Add GET probe | `0x359cbdfeec68710c8b40106d5f926407d7dae8612087d6d4171ea9de6a3d8cc6` | accepted |
+| GET audit | `0xe94f3195f3a02059bc280c6b5f44ec95a1936852ab216f5dfb49b1e195ddd5d9` | `CONFORMANT` |
+| Change specification | `0x083ff805719dca265c3366ed80ab0588889e6d29e1b68bcfdd5ec022689427d5` | old receipt stale |
+| Owner POST audit | `0xb468dfb7978f5d390f259a24e97453a82d6710d81ee83c2d5a60229beb219f5d` | accepted |
+
+## 30-second reviewer version
+
+Conform answers one narrow reusable question: **does a live agent’s observable behaviour satisfy the policy it published?**
+
+The owner registers a public HTTPS origin, a behavioural specification, and bounded HTTP probes. A caller requests an audit. The leader observes the endpoint and proposes a bounded semantic decision; validators independently repeat the probe and judgement. Only stable decision fields must agree. Deterministic contract code then aggregates the probe results, pins the receipt to the exact policy definition, and exposes a consumer gate for downstream contracts.
+
+Conform is deliberately contract-only. There is no frontend, dashboard, wallet UX, backend service, marketplace, or funds flow. It is a reusable evidence primitive for other Intelligent Contracts.
+
+### What breaks without GenLayer?
+
+| Replacement | Lost property |
+|---|---|
+| One off-chain model | A single operator can choose or selectively report the judgement. |
+| Central HTTP oracle | Another service becomes the authority for live observations and semantic interpretation. |
+| Status-code checker | Availability is measured, but behavioural promises such as “refuse without approval” are not judged. |
+| Format-only validator | Valid JSON can still contain a forged verdict or invented evidence. |
+| Caller-supplied response | The caller controls the evidence instead of the contract observing the endpoint. |
+
+The load-bearing GenLayer property is independent validator re-execution of the live probe and semantic judgement. The model does not directly write the aggregate status.
 
 **Consensus-backed behavioural conformance audits for autonomous agents.**
 
@@ -56,6 +87,8 @@ behaviour specification + probe suite
                  v
           immutable audit receipt
 ```
+
+The boundary is intentional: nondeterminism is limited to live observation and semantic classification; endpoint admission, ownership, freshness, hashing, aggregation, and persistence remain deterministic.
 
 ## Why this is an Intelligent Contract
 
@@ -288,6 +321,16 @@ Registration, ownership, input bounds, URL checks, version increments, probe sel
 ## Failure and freshness semantics
 
 An HTTP 5xx or transport/model exception is `UNAVAILABLE`; a response that cannot establish compliance is `INCONCLUSIVE`; a clearly nonconforming response is `FAIL`. A failed critical probe forces `BREACHED`. If validators disagree on a stable decision field, the nondeterministic equivalence check fails and no audit state is accepted. A receipt remains historical: any endpoint, specification, probe, or enablement change increments `spec_version`, and consumers should require `is_current_spec` before using it as a gate.
+
+## Reviewer fast path
+
+If you have five minutes:
+
+1. Read the live deployment and lifecycle evidence above and in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+2. Inspect [`contracts/conform.py`](contracts/conform.py), especially `audit`, the validator re-execution path, definition hashing, and deterministic aggregation.
+3. Read [`docs/CONSENSUS.md`](docs/CONSENSUS.md) for the equivalence rule and [`docs/SECURITY.md`](docs/SECURITY.md) for endpoint and prompt-data boundaries.
+4. Run the deterministic helper suite, then inspect [`tests/test_conform.py`](tests/test_conform.py) for Direct Mode coverage.
+5. Use [`examples/consumer_gate.py`](examples/consumer_gate.py) to see how another Intelligent Contract can require an exact current verdict.
 
 ## Testing and runtime evidence
 
