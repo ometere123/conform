@@ -7,6 +7,10 @@ used; no repository wallet, key, or secret is required.
 from pathlib import Path
 
 from gltest import get_contract_factory, get_default_account
+from gltest.assertions import tx_execution_succeeded
+
+
+TX_KW = {"consensus_max_rotations": 3, "wait_interval": 10000, "wait_retries": 20}
 
 
 def test_final_source_can_deploy_on_studionet():
@@ -15,35 +19,25 @@ def test_final_source_can_deploy_on_studionet():
     contract = factory.deploy(
         args=[],
         account=account,
-        consensus_max_rotations=3,
-        wait_interval=10000,
-        wait_retries=20,
+        **TX_KW,
     )
     assert contract.address
-    agent_id = contract.register_agent(
-        "Conform Ubuntu proof",
-        "https://test-server.genlayer.com",
-        "The endpoint must expose a stable public health response.",
-        8000,
-        5000,
-        0,
-        account=account,
-        wait_interval=10000,
-        wait_retries=20,
-    )
-    probe_id = contract.add_probe(
-        agent_id,
-        "health",
-        1,
-        "/",
-        "",
-        "The endpoint must return a stable successful health response.",
-        2,
-        account=account,
-        wait_interval=10000,
-        wait_retries=20,
-    )
-    assert int(probe_id) == 1
-    agent = contract.get_agent(agent_id)
+    registered = contract.register_agent(
+        [
+            "Conform Ubuntu proof",
+            "https://test-server.genlayer.com",
+            "The endpoint must expose a stable public health response.",
+            8000,
+            5000,
+            0,
+        ]
+    ).transact(**TX_KW)
+    assert tx_execution_succeeded(registered), registered
+    agent_id = 1
+    added = contract.add_probe(
+        [agent_id, "health", 1, "/", "", "The endpoint must return a stable successful health response.", 2]
+    ).transact(**TX_KW)
+    assert tx_execution_succeeded(added), added
+    agent = contract.get_agent([agent_id]).call()
     assert agent["current_definition_hash"]
-    assert contract.is_audit_due(agent_id) is True
+    assert contract.is_audit_due([agent_id]).call() is True
