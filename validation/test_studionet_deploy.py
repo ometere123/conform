@@ -30,6 +30,7 @@ def write(client, account, address, function_name, args):
     print(f"WRITE_SIGNATURE={inspect.signature(client.write_contract)}")
     values = {
         "address": address,
+        "contract_address": address,
         "function_name": function_name,
         "account": account,
         "value": 0,
@@ -50,6 +51,7 @@ def read(client, account, address, function_name, args):
     print(f"READ_SIGNATURE={inspect.signature(client.read_contract)}")
     values = {
         "address": address,
+        "contract_address": address,
         "function_name": function_name,
         "account": account,
         "args": args,
