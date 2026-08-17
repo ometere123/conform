@@ -12,9 +12,11 @@ The validator comparison is substantive. It requires each probe's semantic verdi
 
 ## Deterministic state and semantics
 
-The contract stores `AgentProfile`, `Probe`, and append-only `AuditReceipt` records. Ownership controls profile and probe changes; auditing is permissionless. Specification, endpoint, and probe changes increment `spec_version`, so consumers can reject stale receipts. Aggregation is deterministic: critical failures force `BREACHED`, unavailable observations remain distinct from behavioural failures, and insufficient observations produce `INCONCLUSIVE`.
+The contract stores `AgentProfile`, `Probe`, and append-only `AuditReceipt` records. Ownership controls profile and probe changes; GET-only auditing is permissionless after cooldown, while enabled POST probes make auditing owner-only because POST may have side effects. Specification, endpoint, and probe changes increment `spec_version`, so consumers can reject stale receipts. Aggregation is deterministic: critical failures force `BREACHED`, unavailable observations remain distinct from behavioural failures, and insufficient observations produce `INCONCLUSIVE`.
 
 ## Reuse
+
+GET-only profiles are permissionless after cooldown; enabled POST profiles are owner-only because POST can have side effects. Consumers can pin an exact policy with `is_conformant_for(agent_id, expected_definition_hash)` and apply their own age limit to `audited_at`.
 
 Consumers can call `latest_verdict(agent_id)` and require `has_audit`, `is_current_spec`, and `status_name == "CONFORMANT"` before allowing a workflow, release, marketplace listing, governance action, or other operation. The consumer does not need to reproduce HTTP access, prompts, validator comparison, or threshold arithmetic.
 
@@ -24,7 +26,7 @@ The fast checks are intentionally independent of external GenVM assets: `python 
 
 ## Security boundary
 
-Only public HTTP(S) origins are accepted. Credentials, localhost, loopback/private/link-local IPv4, `.local`/`.internal` names, and IPv6/colon hosts are rejected; paths are relative to the registered origin. These are conservative application-level checks, not a complete DNS firewall. Response bodies are untrusted prompt data, bounded before model interpretation, and never treated as instructions.
+Only public HTTPS DNS origins are accepted. Credentials, explicit ports, localhost, loopback/private/link-local IPv4, raw/numeric IPs, `.local`/`.internal` names, and IPv6/colon hosts are rejected; paths are relative to the registered origin. These are conservative application-level checks, not a complete DNS firewall. Response bodies are untrusted prompt data, bounded before model interpretation, and never treated as instructions.
 
 ## Limitations
 

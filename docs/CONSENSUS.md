@@ -11,7 +11,7 @@ For every enabled probe, Conform executes a custom `gl.vm.run_nondet_unsafe` lea
 The leader:
 
 1. sends the stored HTTP request to the registered public endpoint;
-2. records the HTTP status and a bounded response body;
+2. records the HTTP status (supporting the current runtime's `status` field and the documented `status_code` spelling) and a bounded response body;
 3. asks an LLM to classify that response against the frozen behavioural specification and probe expectation;
 4. canonicalises the result into stable fields.
 
@@ -25,6 +25,8 @@ It independently repeats the HTTP request and LLM classification. It then compar
 - HTTP response class.
 
 Evidence prose and reason wording are intentionally not consensus-critical.
+
+Before comparison, the validator requires a typed canonical decision: an integer allowed verdict, an HTTP class in `0..5`, and bounded string reason/evidence fields. This is stricter than checking that a JSON object exists, but it does not replace independent re-execution. The follower still performs its own HTTP request and semantic judgement.
 
 ## Why not strict equality
 

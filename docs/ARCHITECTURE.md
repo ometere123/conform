@@ -8,16 +8,16 @@ Conform is a reusable behavioural conformance primitive for autonomous agents an
 2. **Behavioural, not availability-only**: a successful HTTP response does not prove that an agent respected its policy.
 3. **Consensus-backed**: validators independently call the live endpoint and independently classify the observable behaviour.
 4. **Fail closed**: unavailable or ambiguous observations never become passing observations.
-5. **Version-aware**: every audit receipt is pinned to the exact specification/probe-suite version it tested.
+5. **Version/hash/time-aware**: every receipt is pinned to the exact definition version, canonical fingerprint, and audit timestamp it tested.
 6. **Deterministic settlement surface**: the model produces probe-level observations only; deterministic code computes the final status.
 
 ## State model
 
 ### AgentProfile
 
-An agent registration stores owner address, name, public endpoint, behavioural specification, monotonically increasing `spec_version`, thresholds, bounded probe suite, latest audit reference, latest status, and consecutive breach count.
+An agent registration stores owner address, name, public endpoint, behavioural specification, monotonically increasing `spec_version`, thresholds, bounded probe suite, audit cooldown, latest audit reference/time/status, definition fingerprint, and consecutive breach count. Pause/resume and policy changes are versioned configuration changes.
 
-Only the owner can mutate the profile. Auditing is permissionless.
+Only the owner can mutate the profile. GET-only auditing is permissionless after cooldown; enabled POST probes make auditing owner-only because POST may have side effects.
 
 ### Probe
 
@@ -36,7 +36,7 @@ The HTTP request shape is deterministic. Only interpretation of the live respons
 
 An audit is append-only. It records the agent id, tested specification version, aggregate verdict, pass basis points, pass/fail/inconclusive/unavailable counts, critical-failure count, summary, and one `ProbeResult` for every enabled probe.
 
-Old receipts remain historical evidence after an owner updates the profile. `latest_verdict()` exposes `is_current_spec` so a consumer can reject stale evidence.
+Old receipts remain historical evidence after an owner updates the profile. `latest_verdict()` exposes version, hash, timestamp, active, and reliable fields; `is_conformant_for()` lets a consumer pin an exact expected definition.
 
 ## Flow
 
@@ -48,7 +48,8 @@ register_agent
               v
           audit(agent_id)
               |
-              +--> snapshot current spec version
+              +--> deterministic cooldown + permission gate
+              +--> snapshot current definition hash/time
               |
               +--> probe 1: HTTP -> classify -> validator re-probe
               +--> probe 2: HTTP -> classify -> validator re-probe
@@ -58,10 +59,18 @@ register_agent
         deterministic aggregation
               |
               v
-        immutable AuditReceipt
+        version/hash/time-pinned AuditReceipt
               |
               v
        consumer reads latest_verdict()
+```
+
+The contract boundary is deliberately split:
+
+```text
+DETERMINISTIC: admission, ownership, cooldown, permissions, hashing,
+               freshness, aggregation, receipt persistence
+NONDETERMINISTIC: live HTTP observation and semantic judgement only
 ```
 
 ## Deterministic aggregation

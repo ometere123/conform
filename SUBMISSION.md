@@ -10,7 +10,7 @@ Conform is not a complete app and intentionally has no frontend.
 
 Existing service checks can answer whether an endpoint is reachable. Conform answers a harder question: whether the endpoint's **observed behaviour** conforms to the natural-language restrictions and capabilities it committed to.
 
-A registered profile contains a versioned specification and a bounded set of executable HTTP probes. Anyone can trigger an audit. The resulting receipt can be consumed by other Intelligent Contracts.
+A registered profile contains a versioned specification and a bounded set of executable HTTP probes. GET-only profiles can be audited permissionlessly after cooldown; profiles with enabled POST probes are owner-only because POST may have side effects. The resulting receipt can be consumed by other Intelligent Contracts.
 
 ## Why GenLayer consensus is necessary
 
@@ -37,11 +37,14 @@ The leader calls the live endpoint and classifies the observed response. A valid
 
 The model never chooses the aggregate contract status.
 
+GET-only profiles are permissionless after a deterministic cooldown. Enabled POST profiles are owner-only to prevent active side-effect abuse. Owners may lower but not raise the interval, and pause/resume invalidates prior reliability.
+
 ## State design
 
 - `AgentProfile`: owner, endpoint, specification, version, thresholds, probes, latest result.
 - `Probe`: bounded request + expectation + severity.
 - `AuditReceipt`: append-only version-pinned aggregate and per-probe results.
+- `AuditReceipt`: also stores the canonical definition hash and transaction timestamp.
 - `ProbeResult`: bounded semantic verdict and evidence metadata.
 
 ## Equivalence design
@@ -65,9 +68,11 @@ A consumer only needs `latest_verdict(agent_id)` or `get_audit(audit_id)`. It do
 
 `examples/consumer_gate.py` demonstrates this composition boundary.
 
+Consumers can pin an expected definition hash with `is_conformant_for(agent_id, expected_hash)` and impose their own acceptable age using `audited_at`. This prevents policy substitution while keeping downstream contracts independent of HTTP and LLM implementation details.
+
 ## Tests included
 
-The Direct Mode suite covers registration, owner-only mutation, private endpoint rejection, cross-origin probe rejection, invalid request-body rejection, specification versioning, no-probe and paused-agent guards, conformant results, critical behavioural breach, 5xx availability handling, explicit inconclusive outcomes, stale receipt detection, and independent validator disagreement.
+The Direct Mode suite covers registration, owner-only mutation, endpoint/probe rejection, specification versioning, no-probe and paused-agent guards, passive/active audit permissions, cooldown, definition-hash freshness, conformant results, critical behavioural breach, 5xx availability handling, explicit inconclusive outcomes, stale receipt detection, and independent validator disagreement.
 
 The validator-disagreement test is the key consensus test: the leader sees a compliant refusal, the validator independently sees an unauthorised execution, and validation returns false.
 

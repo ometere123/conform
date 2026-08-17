@@ -29,6 +29,18 @@ def add_refusal_probe(contract, agent_id, severity=3):
     )
 
 
+def add_get_probe(contract, agent_id):
+    return contract.add_probe(
+        agent_id,
+        "health check",
+        1,
+        "/health",
+        "",
+        "The service must report that it is healthy.",
+        2,
+    )
+
+
 def test_register_agent(direct_deploy):
     contract, agent_id = register(direct_deploy)
     agent = contract.get_agent(agent_id)
@@ -40,7 +52,7 @@ def test_register_agent(direct_deploy):
 
 def test_rejects_private_endpoint(direct_vm, direct_deploy):
     contract = direct_deploy("contracts/conform.py")
-    with direct_vm.expect_revert("endpoint must be a public http(s) URL"):
+    with direct_vm.expect_revert("endpoint must be a public HTTPS DNS origin"):
         contract.register_agent("bad", "http://127.0.0.1:8080", SPEC)
 
 
@@ -48,7 +60,7 @@ def test_rejects_private_endpoint(direct_vm, direct_deploy):
 
 def test_rejects_ipv6_loopback_endpoint(direct_vm, direct_deploy):
     contract = direct_deploy("contracts/conform.py")
-    with direct_vm.expect_revert("endpoint must be a public http(s) URL"):
+    with direct_vm.expect_revert("endpoint must be a public HTTPS DNS origin"):
         contract.register_agent("bad", "http://[::1]", SPEC)
 
 
@@ -98,7 +110,77 @@ def test_only_owner_may_modify(direct_vm, direct_deploy, direct_alice):
 def test_audit_requires_enabled_probe(direct_vm, direct_deploy):
     contract, agent_id = register(direct_deploy)
     with direct_vm.expect_revert("agent has no enabled probes"):
+            contract.audit(agent_id)
+
+
+def test_post_probe_audit_is_owner_only(direct_vm, direct_deploy, direct_alice):
+    contract, agent_id = register(direct_deploy)
+    add_refusal_probe(contract, agent_id)
+    assert contract.get_agent(agent_id)["audit_permission"] == "OWNER_ONLY"
+    with direct_vm.prank(direct_alice):
+        with direct_vm.expect_revert("active probes require the agent owner"):
+            contract.audit(agent_id)
+
+
+def test_get_probe_audit_remains_permissionless(direct_vm, direct_deploy, direct_alice):
+    contract, agent_id = register(direct_deploy)
+    add_get_probe(contract, agent_id)
+    assert contract.get_agent(agent_id)["audit_permission"] == "PERMISSIONLESS"
+    direct_vm.mock_web(r"agent\.example/api/health", {"status": 200, "body": "healthy"})
+    direct_vm.mock_llm(
+        r"auditing the observable behaviour",
+        {"verdict": "PASS", "reason_code": "HEALTHY", "evidence": "healthy"},
+    )
+    with direct_vm.prank(direct_alice):
         contract.audit(agent_id)
+
+
+def test_audit_cooldown_is_deterministic(direct_vm, direct_deploy):
+    contract, agent_id = register(direct_deploy)
+    add_get_probe(contract, agent_id)
+    direct_vm.mock_web(r"agent\.example/api/health", {"status": 200, "body": "healthy"})
+    direct_vm.mock_llm(
+        r"auditing the observable behaviour",
+        {"verdict": "PASS", "reason_code": "HEALTHY", "evidence": "healthy"},
+    )
+    contract.audit(agent_id)
+    assert contract.is_audit_due(agent_id) is False
+    with direct_vm.expect_revert("audit cooldown active"):
+        contract.audit(agent_id)
+
+
+def test_pause_invalidates_reliability_and_definition(direct_vm, direct_deploy):
+    direct_vm.mock_web(r"agent\.example/api/health", {"status": 200, "body": "healthy"})
+    direct_vm.mock_llm(
+        r"auditing the observable behaviour",
+        {"verdict": "PASS", "reason_code": "HEALTHY", "evidence": "healthy"},
+    )
+    contract, agent_id = register(direct_deploy)
+    add_get_probe(contract, agent_id)
+    audit_id = contract.audit(agent_id)
+    old_hash = contract.get_audit(audit_id)["audited_definition_hash"]
+    assert contract.is_conformant_for(agent_id, old_hash) is True
+    contract.set_paused(agent_id, True)
+    latest = contract.latest_verdict(agent_id)
+    assert latest["agent_active"] is False
+    assert latest["reliable"] is False
+    assert latest["definition_matches"] is False
+
+
+def test_definition_hash_is_exposed_and_pins_receipt(direct_vm, direct_deploy):
+    direct_vm.mock_web(r"agent\.example/api/health", {"status": 200, "body": "healthy"})
+    direct_vm.mock_llm(
+        r"auditing the observable behaviour",
+        {"verdict": "PASS", "reason_code": "HEALTHY", "evidence": "healthy"},
+    )
+    contract, agent_id = register(direct_deploy)
+    add_get_probe(contract, agent_id)
+    agent = contract.get_agent(agent_id)
+    audit_id = contract.audit(agent_id)
+    receipt = contract.get_audit(audit_id)
+    assert len(agent["current_definition_hash"]) == 64
+    assert receipt["audited_definition_hash"] == agent["current_definition_hash"]
+    assert contract.is_conformant_for(agent_id, agent["current_definition_hash"]) is True
 
 
 def test_paused_agent_cannot_be_audited(direct_vm, direct_deploy):

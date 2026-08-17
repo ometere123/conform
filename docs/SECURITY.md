@@ -18,9 +18,21 @@ The response body is explicitly treated as untrusted evidence. Instructions insi
 
 ### Validator-side SSRF
 
-Registrations reject obvious loopback, link-local, private IPv4 ranges, `.local`, and `.internal` hosts. Probe paths must be relative, so a probe cannot directly switch to a different origin.
+Registrations require HTTPS DNS origins and reject credentials, fragments, backslashes, raw/numeric IP literals, malformed DNS labels, loopback, link-local, private IPv4, localhost variants, `.local`, `.internal`, and IPv6/colon hosts. Probe paths must be non-empty, relative, free of control characters/backslashes, and cannot use protocol-relative or absolute URLs.
 
-This is a conservative application-level barrier, not a substitute for validator/runtime egress controls. DNS rebinding, redirects, IPv6 variants, and exotic address representations remain infrastructure-level concerns.
+This is a conservative application-level barrier, not a substitute for validator/runtime egress controls. DNS rebinding, redirects, and resolver behavior remain infrastructure-level concerns.
+
+### Active POST probes
+
+Enabled POST probes are owner-only to audit. This prevents a permissionless stranger from repeatedly causing an endpoint side effect. POST configuration is public and should never contain secrets; sandbox, dry-run, echo, or idempotent endpoints are the intended use.
+
+### Cadence and suppression
+
+Each profile has a deterministic audit cooldown. The first audit is immediate; subsequent audits are rejected until due. Owners may lower, but not increase, the interval. This bounds external-service and validator pressure without allowing an owner to silently suppress observation.
+
+### Policy substitution and temporal freshness
+
+Every accepted receipt stores the canonical definition hash and transaction timestamp. Configuration changes increment the version and change the hash; pause/resume also invalidates reliability. Consumers can require `is_conformant_for(agent_id, expected_hash)` and impose their own maximum age policy.
 
 ### Unbounded resource consumption
 

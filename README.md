@@ -6,6 +6,10 @@ Conform is a standalone GenLayer Intelligent Contract primitive. It lets an agen
 
 There is intentionally **no frontend** in this repository. Conform is infrastructure for other builders and Intelligent Contracts to compose with.
 
+> **Core invariant:** no verdict is persisted because a leader asserted it. Validators independently rerun the enabled probes, independently judge the observations, and must agree on stable decision fields before deterministic aggregation and persistence.
+
+Every receipt is also bound to a deterministic behavioural-definition hash and audit timestamp, so a downstream contract can require conformance to its exact expected policy rather than to whatever easier policy an owner currently publishes.
+
 ## The problem
 
 An agent can be online, return HTTP 200, and still behave incorrectly.
@@ -52,6 +56,8 @@ At the same time, accepting one model answer would make the contract a thin LLM 
 - deterministic contract code computes the final aggregate status.
 
 The model never directly chooses `CONFORMANT`, `DEGRADED`, or `BREACHED`.
+
+Delete GenLayer from this design and the important property disappears: an ordinary contract cannot independently obtain live web observations and semantically adjudicate them across validators. A single off-chain model response would be an oracle; a schema check would only prove formatting; an uptime check would not prove that a service refused an unauthorised action. Conform uses nondeterminism only for observation and semantic judgement, then makes policy, freshness, hashing, aggregation, and persistence deterministic.
 
 ## Status model
 
@@ -114,7 +120,7 @@ audit_id = conform.audit(agent_id)
 receipt = conform.get_audit(audit_id)
 ```
 
-Auditing is permissionless. The owner controls the registered specification and probe suite; any caller can test the current version.
+GET-only auditing is permissionless after the deterministic cooldown. If the profile enables any POST probe, auditing is owner-only because the probe may have side effects. The owner controls the registered specification and probe suite.
 
 ### 4. Consume the verdict from another Intelligent Contract
 
@@ -155,7 +161,18 @@ A probe contains a deterministic HTTP request shape and a semantic expectation:
 
 ### `AuditReceipt`
 
-Receipts are append-only and pinned to the exact `spec_version` tested. Updating the endpoint, specification, probe suite, or probe enablement increments the version. Consumers can therefore reject stale evidence using `is_current_spec`.
+Receipts are append-only and pinned to the exact `spec_version`, `definition_hash`, and `audited_at` tested. Updating the endpoint, specification, probe suite, active state, or audit policy increments the version and changes the fingerprint. Consumers can reject stale evidence using `is_current_spec`, `definition_matches`, and `reliable`.
+
+### Definition fingerprint
+
+The fingerprint is Keccak-256 over canonical JSON containing the endpoint, specification, thresholds, audit interval, active state, and every probe's ordered identity/configuration. It is not a hash of model prose. Consumers can pin a known-good policy:
+
+```python
+if conform.is_conformant_for(agent_id, EXPECTED_DEFINITION_HASH):
+    enable_privileged_workflow()
+```
+
+This prevents policy substitution: a newly conformant receipt for a weakened specification does not satisfy a consumer that pinned the original definition.
 
 ## Consensus design
 
@@ -210,9 +227,12 @@ That distinction is the primitive. Uptime alone cannot provide it.
 
 Conform deliberately includes conservative guardrails:
 
-- public HTTP(S) endpoint requirement;
+- public HTTPS DNS-origin requirement;
+- credential-bearing URLs, ambiguous host forms, raw IP literals, private/loopback/link-local hosts, and IPv6/colon hosts rejected;
 - obvious loopback, private and link-local hosts rejected;
 - probe paths must be relative, preventing direct cross-origin escape;
+- enabled POST probes are owner-only to audit because permissionless callers must not be able to trigger active side effects;
+- per-agent audit cooldown limits validator/service spam, and owners may only lower the configured interval;
 - endpoint payloads are explicitly treated as untrusted prompt data;
 - bounded probe count and input/response sizes;
 - explicit `INCONCLUSIVE` and `UNAVAILABLE` states;
@@ -221,9 +241,17 @@ Conform deliberately includes conservative guardrails:
 
 These are application-level defences, not a claim of perfect SSRF or prompt-injection immunity. See [`docs/SECURITY.md`](docs/SECURITY.md).
 
+## Passive versus active probes
+
+GET probes are passive by default and may be audited permissionlessly after the deterministic cooldown. POST probes are active: if any enabled POST exists, only the profile owner may call `audit`. POST bodies are public contract state and should contain no secrets; use sandbox, dry-run, echo, or idempotent endpoints. Disabling all POST probes restores permissionless auditing.
+
+## Freshness and reliability
+
+Every profile has a bounded `min_audit_interval_seconds` (default 300 seconds; `0` is allowed for controlled testing) and exposes `is_audit_due`. An owner may lower the interval but cannot silently make evidence less observable by increasing it. Pause/resume changes the definition version and hash, so an old conformant receipt becomes unreliable and does not pass the exact-definition gate. `latest_verdict` exposes `agent_active`, `reliable`, `audited_at`, `current_definition_hash`, `audited_definition_hash`, and `definition_matches`.
+
 ## Endpoint policy in detail
 
-`register_agent` accepts only `http://` and `https://` origins. Credentials in the authority (`user:password@host`) are rejected, as are empty hosts, localhost, loopback IPv4, private IPv4 (`10/8`, `172.16/12`, `192.168/16`), link-local IPv4 (`169.254/16`), `.local` and `.internal` names, and IPv6/colon hosts. The IPv6 rule is intentionally fail-closed rather than pretending that this small contract helper can perform complete IPv6 classification. Probe paths must be relative and are joined to the registered origin, preventing a probe from selecting a different origin. These checks do not replace validator/runtime egress controls or DNS-level protections.
+`register_agent` accepts only HTTPS DNS origins without explicit ports, credentials, fragments, queries, or ambiguous encodings. Empty hosts, localhost, loopback IPv4, private IPv4 (`10/8`, `172.16/12`, `192.168/16`), link-local IPv4 (`169.254/16`), raw/numeric IP literals, `.local` and `.internal` names, and IPv6/colon hosts are rejected. The IPv6 rule is intentionally fail-closed rather than pretending that this small contract helper can perform complete IPv6 classification. Probe paths must be relative and are joined to the registered origin, preventing a probe from selecting a different origin. These checks do not replace validator/runtime egress controls or DNS-level protections.
 
 ## Deterministic and nondeterministic boundary
 
@@ -290,6 +318,8 @@ pytest tests/ -v
 ```
 
 Coverage includes registration, ownership, endpoint/probe hardening, versioning, conformant results, critical breaches, unavailable/inconclusive handling, stale receipts, and a validator-disagreement case where the follower independently observes a different semantic outcome.
+
+The deterministic helper suite additionally covers both live response field spellings (`status` and documented `status_code`), malformed status rejection, canonical definition hashing, typed decision validation, credential URLs, and the exhaustive two-probe aggregation sweep. The current observed result is 144 exhaustive combinations plus edge cases.
 
 ## Repository layout
 

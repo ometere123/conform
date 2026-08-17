@@ -11,6 +11,7 @@ AUDIT_DEGRADED = 2
 class IConform:
     class View:
         def latest_verdict(self, agent_id: u256) -> dict: ...
+        def is_conformant_for(self, agent_id: u256, expected_definition_hash: str) -> bool: ...
 
     class Write:
         def audit(self, agent_id: u256) -> u256: ...
@@ -26,10 +27,12 @@ class AgentGate(gl.Contract):
     conform: Address
     agent_id: u256
     require_fresh_spec: bool
+    expected_definition_hash: str
 
-    def __init__(self, conform: Address, agent_id: u256, require_fresh_spec: bool = True):
+    def __init__(self, conform: Address, agent_id: u256, expected_definition_hash: str, require_fresh_spec: bool = True):
         self.conform = conform if isinstance(conform, Address) else Address(conform)
         self.agent_id = agent_id
+        self.expected_definition_hash = str(expected_definition_hash)
         self.require_fresh_spec = require_fresh_spec
 
     @gl.public.view
@@ -39,9 +42,15 @@ class AgentGate(gl.Contract):
             return {"allowed": False, "reason": "NO_AUDIT"}
         if self.require_fresh_spec and not bool(verdict["is_current_spec"]):
             return {"allowed": False, "reason": "STALE_AUDIT"}
+        if not bool(verdict["agent_active"]) or not bool(verdict["reliable"]):
+            return {"allowed": False, "reason": "UNRELIABLE"}
+        if not IConform(self.conform).view().is_conformant_for(
+            self.agent_id, self.expected_definition_hash
+        ):
+            return {"allowed": False, "reason": "DEFINITION_MISMATCH"}
 
         status = int(verdict["status"])
-        allowed = status in (AUDIT_CONFORMANT, AUDIT_DEGRADED)
+        allowed = status == AUDIT_CONFORMANT
         return {
             "allowed": allowed,
             "reason": str(verdict["status_name"]),

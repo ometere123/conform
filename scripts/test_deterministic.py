@@ -48,6 +48,10 @@ FUNCTIONS = {
     "probe_verdict_name",
     "response_class",
     "parse_request_body",
+    "response_status",
+    "canonical_definition_payload",
+    "definition_hash",
+    "valid_decision_shape",
     "canonical_decision",
     "aggregate_results",
 }
@@ -56,7 +60,10 @@ FUNCTIONS = {
 def load_helpers() -> dict:
     source = CONTRACT.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(CONTRACT))
-    selected: list[ast.stmt] = [ast.Import(names=[ast.alias(name="json")])]
+    selected: list[ast.stmt] = [
+        ast.Import(names=[ast.alias(name="json")]),
+        ast.ImportFrom(module="eth_hash.auto", names=[ast.alias(name="keccak")], level=0),
+    ]
 
     for node in tree.body:
         if isinstance(node, ast.Assign):
@@ -103,20 +110,41 @@ def run() -> None:
         "http://service.internal",
         "http://thing.local",
         "https://user:password@agent.example/api",
+        "https://8.8.8.8/service",
+        "https://api.example.org:443/service",
+        "https://api.example.org/path?x=1",
         "http://[::1]",
     ):
         check(not h["endpoint_is_safe"](unsafe), f"unsafe endpoint accepted: {unsafe}")
 
     for safe in (
         "https://agent.example/api",
-        "https://api.example.com:443/v1",
-        "http://8.8.8.8/service",
+        "https://api.example.com/v1",
+        "https://api.example.org/service",
     ):
         check(h["endpoint_is_safe"](safe), f"public endpoint rejected: {safe}")
 
     # Request-body parsing is deterministic and refuses scalar JSON.
     check(h["parse_request_body"]('{"x":1}') == {"x": 1}, "object JSON")
     check(h["parse_request_body"]('[1,2]') == [1, 2], "array JSON")
+    class Status:
+        status = 200
+    class StatusCode:
+        status_code = 204
+    check(h["response_status"](Status()) == 200, "live response status")
+    check(h["response_status"](StatusCode()) == 204, "documented response status_code")
+    try:
+        h["response_status"](type("Bad", (), {"status": True})())
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("boolean response status accepted")
+    payload = [{"probe_id": 1, "method": 1, "path": "/health", "enabled": True}]
+    first_hash = h["definition_hash"]("https://api.example.org", "healthy", 8000, 5000, 300, 1, payload)
+    second_hash = h["definition_hash"]("https://api.example.org", "healthy", 8000, 5000, 300, 1, payload)
+    check(first_hash == second_hash and len(first_hash) == 64, "definition hash determinism")
+    check(h["valid_decision_shape"]({"verdict": h["PROBE_PASS"], "http_class": 2, "reason_code": "OK", "evidence": "ok"}), "typed decision")
+    check(not h["valid_decision_shape"]({"verdict": True, "http_class": 2, "reason_code": "OK", "evidence": "ok"}), "boolean verdict rejected")
     for scalar in ("1", '"text"', "true", "null"):
         try:
             h["parse_request_body"](scalar)
