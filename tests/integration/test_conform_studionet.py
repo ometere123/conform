@@ -4,6 +4,7 @@ from pathlib import Path
 
 from gltest import get_contract_factory, get_default_account
 from gltest.assertions import tx_execution_succeeded
+from gltest.utils import extract_contract_address
 
 
 # Studionet allows roughly 30 RPC requests/minute.  Slow polling is essential:
@@ -28,10 +29,17 @@ def tx_summary(label, tx):
 
 def test_final_source_full_passive_lifecycle_on_studionet():
     account = get_default_account()
-    contract = get_contract_factory(contract_file_path=Path("conform.py")).deploy(
+    factory = get_contract_factory(contract_file_path=Path("conform.py"))
+    deployment = factory.deploy_contract_tx(
         account=account, **TX_KW
     )
+    tx_summary("DEPLOY", deployment)
+    assert tx_execution_succeeded(deployment), deployment
+    contract = factory.build_contract(
+        contract_address=extract_contract_address(deployment), account=account
+    )
     print("DEPLOYED_CONTRACT", contract.address)
+    print("DEPLOYER", account.address)
 
     registered = contract.register_agent(
         ["Conform GET proof", "https://test-server.genlayer.com", SPEC, 8000, 5000, 0]
