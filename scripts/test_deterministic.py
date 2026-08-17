@@ -102,6 +102,7 @@ def run() -> None:
         "http://169.254.169.254",
         "http://service.internal",
         "http://thing.local",
+        "https://user:password@agent.example/api",
         "http://[::1]",
     ):
         check(not h["endpoint_is_safe"](unsafe), f"unsafe endpoint accepted: {unsafe}")

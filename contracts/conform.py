@@ -184,6 +184,12 @@ def endpoint_is_safe(url: str) -> bool:
     text = str(url).strip().lower()
     if not (text.startswith("https://") or text.startswith("http://")):
         return False
+    # Credentials make the endpoint ambiguous and can leak secrets through
+    # logs, prompts, or validator-side request handling.  Reject them rather
+    # than attempting to interpret userinfo as part of the origin.
+    authority = text.split("://", 1)[1].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+    if "@" in authority:
+        return False
     host = host_of(text)
     if host == "":
         return False

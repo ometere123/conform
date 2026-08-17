@@ -71,6 +71,10 @@ The Direct Mode suite covers registration, owner-only mutation, private endpoint
 
 The validator-disagreement test is the key consensus test: the leader sees a compliant refusal, the validator independently sees an unauthorised execution, and validation returns false.
 
+The permanent deterministic check extracts and executes the actual pure helpers from `contracts/conform.py`; it currently passes 144 exhaustive two-probe combinations plus edge cases, including private/IPv6 and credential-bearing endpoint rejection. Contract compilation passes. The bundled Windows environment has `genlayer-test 0.29.2` and `genlayer-py 0.16.3`, but Direct Mode currently fails before contract import because the runner attempts to unlink its redirected stdin file immediately after `dup2`, producing `PermissionError [WinError 32]`. This is documented as an upstream/platform runner issue, not counted as Conform execution.
+
+No final-source Studionet address, transaction hash, or accepted live `audit()` receipt is claimed in this checkout. Historical network evidence is deliberately not presented as proof for a different source commit.
+
 ## Repository entry points
 
 - `contracts/conform.py` - primitive

@@ -221,6 +221,50 @@ Conform deliberately includes conservative guardrails:
 
 These are application-level defences, not a claim of perfect SSRF or prompt-injection immunity. See [`docs/SECURITY.md`](docs/SECURITY.md).
 
+## Endpoint policy in detail
+
+`register_agent` accepts only `http://` and `https://` origins. Credentials in the authority (`user:password@host`) are rejected, as are empty hosts, localhost, loopback IPv4, private IPv4 (`10/8`, `172.16/12`, `192.168/16`), link-local IPv4 (`169.254/16`), `.local` and `.internal` names, and IPv6/colon hosts. The IPv6 rule is intentionally fail-closed rather than pretending that this small contract helper can perform complete IPv6 classification. Probe paths must be relative and are joined to the registered origin, preventing a probe from selecting a different origin. These checks do not replace validator/runtime egress controls or DNS-level protections.
+
+## Deterministic and nondeterministic boundary
+
+Registration, ownership, input bounds, URL checks, version increments, probe selection, aggregation, breach streaks, and receipt persistence are deterministic. Live HTTP and model interpretation happen inside the equivalence-protected nondeterministic execution. Storage-backed probe records are copied with `gl.storage.copy_to_memory(...)` before entering that execution because GenLayer storage objects are not directly usable there. A leader's evidence is bounded for storage and comparison safety; it is not trusted as proof by validators.
+
+## Public contract surface
+
+| Method | Kind | Purpose |
+|---|---|---|
+| `register_agent` | write | Create an active owned profile with thresholds and a public endpoint. |
+| `update_specification` | write | Replace the specification; owner-only and increments `spec_version`. |
+| `update_endpoint` | write | Replace the endpoint after safety checks; owner-only and versioned. |
+| `set_paused` | write | Pause or resume owner-controlled auditing. |
+| `add_probe` | write | Append a bounded GET/POST probe; owner-only and versioned. |
+| `set_probe_enabled` | write | Enable or disable an existing probe; owner-only and versioned. |
+| `audit` | write | Permissionlessly execute enabled probes, reach consensus, and persist an accepted receipt. |
+| `get_agent` | view | Read profile metadata and probe configuration. |
+| `get_audit` | view | Read a stored version-pinned receipt and per-probe results. |
+| `latest_verdict` | view | Read the latest receipt pointer, status, freshness, and breach streak. |
+
+## Failure and freshness semantics
+
+An HTTP 5xx or transport/model exception is `UNAVAILABLE`; a response that cannot establish compliance is `INCONCLUSIVE`; a clearly nonconforming response is `FAIL`. A failed critical probe forces `BREACHED`. If validators disagree on a stable decision field, the nondeterministic equivalence check fails and no audit state is accepted. A receipt remains historical: any endpoint, specification, probe, or enablement change increments `spec_version`, and consumers should require `is_current_spec` before using it as a gate.
+
+## Testing and runtime evidence
+
+The permanent local checks are:
+
+```bash
+git diff --check
+python -m py_compile contracts/conform.py
+python scripts/test_deterministic.py
+python -m pytest -q
+```
+
+The deterministic suite executes the actual pure helpers from `contracts/conform.py` and currently reports 144 exhaustive two-probe combinations plus edge cases. Direct Mode tests are meaningful runtime tests, but their result depends on the installed official `genlayer-test` and platform. In the Windows environment used for this checkout, the installed runner currently fails before contract execution while unlinking its stdin temporary file (`PermissionError [WinError 32]`). This is not reported as a Conform test failure. Studionet deployment and lifecycle receipts must be recorded against the final source commit; no deployment address or transaction is claimed here without a verifiable final-source receipt.
+
+## Deployment and reuse
+
+Install the current GenLayer tooling according to the official documentation, configure a Studionet account outside the repository, deploy `contracts/conform.py`, and use the returned address with the write methods above. A typical consumer should register a profile, add one or more probes, call `audit(agent_id)`, wait for an accepted receipt, then read `latest_verdict(agent_id)`. Another Intelligent Contract can use the `IConform` interface and gate its own action on `has_audit`, `is_current_spec`, and `status_name == "CONFORMANT"`.
+
 ## Important non-goals
 
 Conform does **not**:
