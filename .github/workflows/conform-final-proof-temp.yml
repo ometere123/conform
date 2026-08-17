@@ -34,6 +34,10 @@ jobs:
           python-version: '3.12.13'
       - run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
       - name: Final-source Studionet integration only
-        run: python -m pytest tests/integration/test_conform_studionet.py::test_final_source_can_deploy_on_studionet --network studionet -q -s
+        run: python -m pytest tests/integration/test_conform_studionet.py::test_final_source_can_deploy_and_register_on_studionet --network studionet -q -s
+      - name: Passive GET audit and reads
+        run: python -m pytest tests/integration/test_conform_studionet.py::test_passive_get_audit_and_reads_on_studionet --network studionet -q -s
+      - name: Freshness proof
+        run: python -m pytest tests/integration/test_conform_studionet.py::test_definition_freshness_on_studionet --network studionet -q -s
       - name: Harmless POST owner proof
         run: python -m pytest tests/integration/test_conform_studionet.py::test_owner_can_audit_harmless_post_profile_on_studionet --network studionet -q -s
