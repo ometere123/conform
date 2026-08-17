@@ -165,6 +165,11 @@ def host_of(url: str) -> str:
             text = text[:index]
     if "@" in text:
         text = text.split("@", 1)[1]
+    if text.startswith("["):
+        end = text.find("]")
+        if end == -1:
+            return ""
+        return text[1:end].strip(".")
     if ":" in text:
         text = text.split(":", 1)[0]
     return text.strip(".")
@@ -183,6 +188,10 @@ def endpoint_is_safe(url: str) -> bool:
     if host == "":
         return False
     if host in ("localhost", "0.0.0.0", "::1"):
+        return False
+    if ":" in host:
+        # Fail closed for IPv6 until private/link-local IPv6 classification is
+        # implemented. This prevents alternate-address SSRF bypasses.
         return False
     if host.endswith(".local") or host.endswith(".internal"):
         return False
@@ -657,7 +666,9 @@ class Conform(gl.Contract):
         active: list[Probe] = []
         for probe in agent.probes:
             if bool(probe.enabled):
-                active.append(probe)
+                # Storage-backed objects must be copied before they are captured
+                # by non-deterministic leader/validator closures.
+                active.append(gl.storage.copy_to_memory(probe))
         if len(active) == 0:
             raise gl.vm.UserError(f"{ERR_EXPECTED}: agent has no enabled probes")
 
