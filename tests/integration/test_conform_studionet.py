@@ -6,7 +6,9 @@ from gltest import get_contract_factory, get_default_account
 from gltest.assertions import tx_execution_succeeded
 
 
-TX_KW = {"consensus_max_rotations": 3, "wait_interval": 10000, "wait_retries": 20}
+# Studionet allows roughly 30 RPC requests/minute.  Slow polling is essential:
+# repeated receipt checks can exhaust the shared window before audit finalizes.
+TX_KW = {"consensus_max_rotations": 3, "wait_interval": 30000, "wait_retries": 12}
 SPEC = "The endpoint must expose a stable public health response."
 
 
