@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import ast
 import json
+from datetime import datetime, timezone
 from pathlib import Path
+from Crypto.Hash import keccak as _crypto_keccak
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,6 +53,7 @@ FUNCTIONS = {
     "response_status",
     "canonical_definition_payload",
     "definition_hash",
+    "message_timestamp",
     "valid_decision_shape",
     "canonical_decision",
     "aggregate_results",
@@ -62,7 +65,9 @@ def load_helpers() -> dict:
     tree = ast.parse(source, filename=str(CONTRACT))
     selected: list[ast.stmt] = [
         ast.Import(names=[ast.alias(name="json")]),
-        ast.ImportFrom(module="eth_hash.auto", names=[ast.alias(name="keccak")], level=0),
+        ast.ImportFrom(module="datetime", names=[
+            ast.alias(name="datetime"), ast.alias(name="timezone")
+        ], level=0),
     ]
 
     for node in tree.body:
@@ -77,7 +82,15 @@ def load_helpers() -> dict:
         elif isinstance(node, ast.FunctionDef) and node.name in FUNCTIONS:
             selected.append(node)
 
-    namespace: dict = {}
+    class NativeHash:
+        def __init__(self, payload):
+            self._hash = _crypto_keccak.new(digest_bits=256)
+            self._hash.update(payload)
+
+        def hexdigest(self):
+            return self._hash.hexdigest()
+
+    namespace: dict = {"Keccak256": NativeHash}
     module = ast.Module(body=selected, type_ignores=[])
     ast.fix_missing_locations(module)
     exec(compile(module, str(CONTRACT), "exec"), namespace)
@@ -95,6 +108,24 @@ def check(condition: bool, label: str) -> None:
 
 def run() -> None:
     h = load_helpers()
+
+    class Raw:
+        datetime = "2026-08-17T12:00:00Z"
+
+    class Message:
+        raw = Raw()
+
+    h["message_timestamp"].__globals__["gl"] = type("GL", (), {"message": Message()})()
+    check(h["message_timestamp"]() == 1786968000, "nested transaction timestamp")
+    h["message_timestamp"].__globals__["gl"] = type("GL", (), {"message_raw": {"datetime": "2026-08-17T13:00:00+01:00"}})()
+    check(h["message_timestamp"]() == 1786968000, "fallback transaction timestamp")
+    h["message_timestamp"].__globals__["gl"] = type("GL", (), {"message_raw": {"datetime": "not-a-timestamp"}})()
+    try:
+        h["message_timestamp"]()
+    except (TypeError, ValueError):
+        pass
+    else:
+        raise AssertionError("malformed transaction timestamp")
 
     # URL construction and origin-safety invariants.
     check(h["join_url"]("https://agent.example/api/", "/transfer") == "https://agent.example/api/transfer", "join_url")

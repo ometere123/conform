@@ -1,4 +1,3 @@
-# v0.1.0
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
@@ -6,7 +5,6 @@ from genlayer import *
 import json
 from datetime import datetime, timezone
 from dataclasses import dataclass
-from eth_hash.auto import keccak
 
 
 # ---------------------------------------------------------------------------
@@ -306,18 +304,27 @@ def definition_hash(
     status: int,
     probes: list[dict],
 ) -> str:
-    return keccak(canonical_definition_payload(
+    return Keccak256(canonical_definition_payload(
         endpoint, specification, conformant_bps, degraded_bps,
         min_audit_interval_seconds, status, probes,
-    ).encode("utf-8")).hex()
+    ).encode("utf-8")).hexdigest()
 
 
 def message_timestamp() -> int:
-    raw = gl.message_raw.get("datetime", "")
+    message = getattr(gl, "message", None)
+    raw_message = getattr(message, "raw", None)
+    raw = getattr(raw_message, "datetime", None)
+    if raw in (None, ""):
+        mapping = getattr(gl, "message_raw", None)
+        raw = mapping.get("datetime", "") if isinstance(mapping, dict) else ""
     if isinstance(raw, int):
         return int(raw)
-    text = str(raw).replace("Z", "+00:00")
-    return int(datetime.fromisoformat(text).replace(tzinfo=timezone.utc).timestamp())
+    if not isinstance(raw, str) or raw.strip() == "":
+        raise ValueError("transaction timestamp is unavailable")
+    parsed = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp())
 
 
 def method_name(method: int) -> str:
@@ -618,6 +625,8 @@ class Conform(gl.Contract):
         agent.owner = gl.message.sender_address
         agent.name = name
         agent.endpoint = endpoint
+        if specification == str(agent.specification):
+            return
         agent.specification = specification
         agent.spec_version = u32(1)
         agent.status = u8(AGENT_ACTIVE)
@@ -653,6 +662,8 @@ class Conform(gl.Contract):
         endpoint = str(endpoint).strip().rstrip("/")
         if len(endpoint) == 0 or len(endpoint) > MAX_ENDPOINT_LEN or not endpoint_is_safe(endpoint):
             raise gl.vm.UserError(f"{ERR_EXPECTED}: endpoint must be a public HTTPS DNS origin")
+        if endpoint == str(agent.endpoint):
+            return
         agent.endpoint = endpoint
         agent.spec_version = u32(int(agent.spec_version) + 1)
         self._refresh_definition_hash(agent)
@@ -662,7 +673,10 @@ class Conform(gl.Contract):
     def set_paused(self, agent_id: u256, paused: bool) -> None:
         agent = self._require_agent(agent_id)
         self._require_owner(agent)
-        agent.status = u8(AGENT_PAUSED if paused else AGENT_ACTIVE)
+        next_status = AGENT_PAUSED if paused else AGENT_ACTIVE
+        if int(agent.status) == next_status:
+            return
+        agent.status = u8(next_status)
         agent.spec_version = u32(int(agent.spec_version) + 1)
         self._refresh_definition_hash(agent)
         AgentPaused(agent_id, bool(paused), agent.spec_version).emit()
@@ -676,6 +690,8 @@ class Conform(gl.Contract):
             raise gl.vm.UserError(f"{ERR_EXPECTED}: invalid audit interval")
         if interval_seconds > current:
             raise gl.vm.UserError(f"{ERR_EXPECTED}: audit interval may only decrease")
+        if interval_seconds == current:
+            return
         agent.min_audit_interval_seconds = u256(interval_seconds)
         agent.spec_version = u32(int(agent.spec_version) + 1)
         self._refresh_definition_hash(agent)
@@ -755,7 +771,10 @@ class Conform(gl.Contract):
         self._require_owner(agent)
         if probe_id <= 0 or probe_id > len(agent.probes):
             raise gl.vm.UserError(f"{ERR_EXPECTED}: unknown probe")
-        agent.probes[probe_id - 1].enabled = bool(enabled)
+        probe = agent.probes[probe_id - 1]
+        if bool(probe.enabled) == bool(enabled):
+            return
+        probe.enabled = bool(enabled)
         agent.spec_version = u32(int(agent.spec_version) + 1)
         self._refresh_definition_hash(agent)
         SpecificationUpdated(agent_id, agent.spec_version).emit()
