@@ -15,12 +15,14 @@ jobs:
           python-version: '3.12'
       - name: Install official GenLayer test tooling
         run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
-      - name: Pure and Direct Mode verification
-        run: |
-          git diff --check
-          python -m py_compile contracts/conform.py
-          python scripts/test_deterministic.py
-          python -m pytest -q
+      - name: Check whitespace
+        run: git diff --check
+      - name: Compile contract
+        run: python -m py_compile contracts/conform.py
+      - name: Deterministic helpers
+        run: python scripts/test_deterministic.py
+      - name: Direct Mode suite
+        run: python -m pytest -q
 
   studionet:
     if: github.event_name == 'workflow_dispatch'

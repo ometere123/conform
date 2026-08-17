@@ -1,3 +1,4 @@
 genlayer-test
 pytest
+pycryptodome
 eth-hash
