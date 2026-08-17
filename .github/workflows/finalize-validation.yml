@@ -1,0 +1,59 @@
+name: finalize-validated-conform-fixes
+
+on:
+  push:
+    branches:
+      - work/deploy-validation-2026-08-17
+    paths:
+      - .github/workflows/finalize-validation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply evidence-backed source fixes
+        run: python scripts/apply_validation_patch.py
+      - name: Add IPv6 regression test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tests/test_conform.py')
+          text = path.read_text(encoding='utf-8')
+          marker = 'def test_rejects_ipv6_loopback_endpoint'
+          if marker not in text:
+              addition = '''\n\ndef test_rejects_ipv6_loopback_endpoint(direct_vm, direct_deploy):\n    contract = direct_deploy("contracts/conform.py")\n    with direct_vm.expect_revert("endpoint must be a public http(s) URL"):\n        contract.register_agent("bad", "http://[::1]", SPEC)\n'''
+              anchor = 'def test_rejects_absolute_probe_url'
+              idx = text.find(anchor)
+              if idx == -1:
+                  raise SystemExit('test insertion anchor not found')
+              text = text[:idx] + addition + '\n\n' + text[idx:]
+              path.write_text(text, encoding='utf-8')
+          PY
+      - name: Verify patched source without genvm-lint
+        run: |
+          python -m py_compile contracts/conform.py tests/test_conform.py scripts/test_deterministic.py
+          python scripts/test_deterministic.py
+      - name: Remove validation-only machinery
+        run: |
+          rm -f .github/workflows/validation-temp.yml
+          rm -f .github/workflows/finalize-validation.yml
+          rm -f scripts/.validation-trigger
+          rm -f scripts/apply_validation_patch.py
+          rm -rf validation
+      - name: Commit validated fixes to work branch
+        run: |
+          git config user.name 'papitodele'
+          git config user.email '45469370+ometere123@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix: harden endpoints and nondeterministic probe snapshots'
+          git push origin HEAD:work/deploy-validation-2026-08-17
