@@ -16,6 +16,12 @@ jobs:
       - run: git diff --check
       - run: python -m py_compile contracts/conform.py
       - run: python scripts/test_deterministic.py
+      - name: Seed compatible cached GenVM artifact
+        run: |
+          mkdir -p "$HOME/.cache/gltest-direct"
+          curl --fail --location \
+            https://github.com/genlayerlabs/genvm/releases/download/v0.2.12/genvm-universal.tar.xz \
+            --output "$HOME/.cache/gltest-direct/genvm-universal-v0.2.12.tar.xz"
       - name: Conform Direct Mode only
         run: python -m pytest tests/test_conform.py -q
 
