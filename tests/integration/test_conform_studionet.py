@@ -74,3 +74,12 @@ def test_final_source_full_passive_lifecycle_on_studionet():
     assert stale["definition_matches"] is False
     assert stale["reliable"] is False
     assert contract.is_conformant_for([1, current_hash]).call() is False
+
+    post_added = contract.add_probe(
+        [1, "harmless echo", 2, "/body/echo", '{"proof":"conform"}', "The endpoint must echo the harmless request body.", 2]
+    ).transact(**TX_KW)
+    tx_summary("ADD_POST_PROBE", post_added)
+    assert tx_execution_succeeded(post_added), post_added
+    owner_post_audit = contract.audit([1]).transact(**TX_KW)
+    tx_summary("OWNER_POST_AUDIT", owner_post_audit)
+    assert tx_execution_succeeded(owner_post_audit), owner_post_audit
